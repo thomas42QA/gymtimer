@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Tabata Timer - Ultimate Edition</title>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            text-align: center; 
+            background-color: #111111; 
+            color: white;
+            padding-top: 20px; 
+        }
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+            background: #222222;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0px 8px 25px rgba(0,0,0,0.7);
+        }
+        
+        /* Instellingen sectie */
+        #instellingen-sectie {
+            transition: all 0.2s ease;
+        }
+
+        /* De Ronde Klok Container */
+        .timer-container {
+            position: relative;
+            width: 270px;
+            height: 270px;
+            margin: 20px auto;
+        }
+        
+        /* SVG Cirkel Styling */
+        .timer-svg {
+            transform: scaleX(-1) rotate(-90deg); 
+            width: 100%;
+            height: 100%;
+        }
+        .cirkel-bg {
+            fill: none;
+            stroke: #2c2c2c;
+            stroke-width: 4.5; /* Aangepast naar 4.5 */
+        }
+        .cirkel-progressie {
+            fill: none;
+            stroke-width: 4.5; /* Aangepast naar 4.5 */
+            stroke-linecap: round;
+            transition: none; 
+        }
+        
+        /* Digitale tijd midden in de cirkel */
+        .timer-text-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 100%;
+        }
+        .timer-box { 
+            font-size: 4.6rem; /* Groter gemaakt zodat het eruit springt */
+            font-weight: bold; 
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        /* Kleurschema (Geel is nu Blauw, Werk = Groen, Rust = Rood) */
+        .status-getready { stroke: #3498db; color: #3498db; } 
+        .status-werk { stroke: #2ecc71; color: #2ecc71; }     
+        .status-rust { stroke: #e74c3c; color: #e74c3c; }     
+        .status-klaar { stroke: #3498db; color: #3498db; }    
+
+        .input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+        }
+        .input-row label { flex: 1; text-align: left; font-weight: bold; color: #bbb; }
+        .input-fields { display: flex; gap: 5px; }
+        input { width: 55px; padding: 10px; font-size: 1.1rem; border-radius: 8px; border: none; text-align: center; background: #333; color: white; }
+        
+        .button-group {
+            display: flex;
+            justify-content: center;
+            margin-top: 25px;
+            gap: 10px;
+        }
+        button { 
+            font-size: 1.1rem; 
+            padding: 14px 22px; 
+            cursor: pointer; 
+            border: none; 
+            border-radius: 8px; 
+            color: white;
+            font-weight: bold;
+            min-width: 110px;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.4);
+        }
+        .btn-start { background-color: #2ecc71; }
+        .btn-pauze { background-color: #e67e22; }
+        .btn-hervat { background-color: #3498db; }
+        .btn-stop { background-color: #e74c3c; }
+        .btn-reset { background-color: #95a5a6; }
+        button:hover { opacity: 0.9; }
+        .info { font-size: 1.4rem; margin: 5px 0; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>GYM TIMER</h1>
+    
+    <div id="instellingen-sectie" style="display: block;">
+        <div class="input-row">
+            <label>Werktijd:</label>
+            <div class="input-fields">
+                <input type="number" id="input-werk-min" value="0" min="0"> <span>m</span>
+                <input type="number" id="input-werk-sec" value="20" min="0" max="59"> <span>s</span>
+            </div>
+        </div>
+        <div class="input-row">
+            <label>Rusttijd:</label>
+            <div class="input-fields">
+                <input type="number" id="input-rust-min" value="0" min="0"> <span>m</span>
+                <input type="number" id="input-rust-sec" value="10" min="0" max="59"> <span>s</span>
+            </div>
+        </div>
+        <div class="input-row">
+            <label>Rondes:</label>
+            <input type="number" id="input-rondes" value="8" min="1">
+        </div>
+        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+    </div>
+
+    <div class="info" id="status-text">READY TO RUMBLE?</div>
+    <div class="info" id="ronde-display">Ronde: 0 / 0</div>
+    
+    <div class="timer-container">
+        <svg class="timer-svg" viewBox="0 0 100 100">
+            <circle class="cirkel-bg" cx="50" cy="50" r="44"></circle>
+            <circle id="progressie-balk" class="cirkel-progressie status-klaar" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+        </svg>
+        <div class="timer-text-box">
+            <div class="timer-box" id="timer-display">00:00</div>
+        </div>
+    </div>
+    
+    <div class="button-group">
+        <button id="btn-start" class="btn-start" onclick="startTimer()">Start</button>
+        <button id="btn-pauze" class="btn-pauze" onclick="pauzeTimer()" style="display: none;">Pauze</button>
+        <button id="btn-hervat" class="btn-hervat" onclick="startTimer()" style="display: none;">Hervat</button>
+        <button id="btn-reset" class="btn-reset" onclick="resetTimer()" style="display: none;">Reset</button>
+        <button id="btn-stop" class="btn-stop" onclick="stopTimer()" style="display: none;">Stop</button>
+    </div>
+</div>
+
+<script>
+    let countdown;
+    let seconden = 0;
+    let maxFaseSeconden = 0; 
+    let huidigeRonde = 1;
+    let totaalRondes = 0;
+    let isRunning = false; 
+    let huidigeFase = 'getready'; 
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const CIRKEL_OMTREK = 2 * Math.PI * 44; // ~276.46
+
+    // EXTRA DOORDINGEND HOGE GYM ALARM SNEIDT DOOR GELUID HEEN
+    function playGymBeep(type) {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth'; 
+        
+        if (type === 'countdown') {
+            osc.frequency.setValueAtTime(1200, audioCtx.currentTime); // Krachtige hoge toon (1200 Hz)
+            gain.gain.setValueAtTime(0.7, audioCtx.currentTime); 
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15); 
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        } else if (type === 'wissel') {
+            osc.frequency.setValueAtTime(1600, audioCtx.currentTime); // Extreem schelle alarmsirene (1600 Hz) voor de wissel
+            gain.gain.setValueAtTime(0.95, audioCtx.currentTime); 
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8); 
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.8);
+        }
+    }
+
+    function formatteerTijd(totaleSeconden) {
+        let mins = Math.floor(totaleSeconden / 60);
+        let secs = totaleSeconden % 60;
+        return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+
+    function updateCirkel() {
+        let balk = document.getElementById("progressie-balk");
+        
+        // Geen aflopende cirkel tonen tijdens de getready (eerste 3 seconden) fase
+        if (huidigeFase === 'getready') {
+            balk.style.strokeDashoffset = 0;
+            return;
+        }
+
+        if (maxFaseSeconden > 0) {
+            let percentageGeweest = (maxFaseSeconden - seconden) / maxFaseSeconden;
+            let offset = CIRKEL_OMTREK * percentageGeweest;
+            balk.style.strokeDashoffset = offset;
+        } else {
+            balk.style.strokeDashoffset = 0;
+        }
+    }
+
+    function startTimer() {
+        if (isRunning) return; 
+        isRunning = true;
+
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
+        // Verberg de instellingen direct bij het starten
+        document.getElementById("instellingen-sectie").style.display = "none";
+
+        document.getElementById("btn-start").style.display = "none";
+        document.getElementById("btn-hervat").style.display = "none";
+        document.getElementById("btn-reset").style.display = "none";
+        document.getElementById("btn-pauze").style.display = "block";
+        document.getElementById("btn-stop").style.display = "block";
+
+        if (seconden === 0 && huidigeRonde === 1 && huidigeFase === 'getready') {
+            totaalRondes = parseInt(document.getElementById("input-rondes").value);
+            seconden = 3; 
+            maxFaseSeconden = 3;
+            updateScherm("GET READY!", "status-getready", 1);
+        } else {
+            let kleurClass = "status-" + huidigeFase;
+            updateScherm(huidigeFase.toUpperCase() + "!", kleurClass, huidigeRonde);
+        }
+
+        updateCirkel();
+
+        countdown = setInterval(function() {
+            seconden--;
+            document.getElementById("timer-display").innerText = formatteerTijd(seconden);
+            updateCirkel();
+            
+            if (seconden > 0 && seconden <= 3) {
+                playGymBeep('countdown');
+            }
+
+            if (seconden <= 0) {
+                playGymBeep('wissel');
+
+                let werkTijd = (parseInt(document.getElementById("input-werk-min").value) * 60) + parseInt(document.getElementById("input-werk-sec").value);
+                let rustTijd = (parseInt(document.getElementById("input-rust-min").value) * 60) + parseInt(document.getElementById("input-rust-sec").value);
+
+                if (huidigeFase === 'getready') {
+                    huidigeFase = 'werk';
+                    seconden = werkTijd;
+                    maxFaseSeconden = werkTijd;
+                    updateScherm("WERK!", "status-werk", huidigeRonde);
+                } 
+                else if (huidigeFase === 'werk') {
+                    huidigeFase = 'rust';
+                    seconden = rustTijd;
+                    maxFaseSeconden = rustTijd;
+                    updateScherm("RUST!", "status-rust", huidigeRonde);
+                } 
+                else if (huidigeFase === 'rust') {
+                    huidigeRonde++;
+                    
+                    if (huidigeRonde > totaalRondes) {
+                        clearInterval(countdown);
+                        isRunning = false;
+                        maxFaseSeconden = 0;
+                        updateScherm("KLAAR!", "status-klaar", totaalRondes);
+                        document.getElementById("timer-display").innerText = "DONE";
+                        updateCirkel();
+                        
+                        setTimeout(() => playGymBeep('wissel'), 300); 
+                        stopTimer(); 
+                        return;
+                    }
+                    
+                    huidigeFase = 'werk';
+                    seconden = werkTijd;
+                    maxFaseSeconden = werkTijd;
+                    updateScherm("WERK!", "status-werk", huidigeRonde);
+                }
+                updateCirkel();
+            }
+        }, 1000);
+    }
+
+    function pauzeTimer() {
+        clearInterval(countdown);
+        isRunning = false;
+        document.getElementById("status-text").innerText = "GEPAUZEERD";
+        
+        // Laat instellingen weer zien bij pauze
+        document.getElementById("instellingen-sectie").style.display = "block";
+
+        document.getElementById("btn-pauze").style.display = "none";
+        document.getElementById("btn-hervat").style.display = "block";
+        document.getElementById("btn-reset").style.display = "block";
+    }
+
+    function stopTimer() {
+        clearInterval(countdown);
+        isRunning = false;
+        seconden = 0;
+        maxFaseSeconden = 0;
+        huidigeRonde = 1;
+        huidigeFase = 'getready';
+        
+        // Laat instellingen weer zien bij stop
+        document.getElementById("instellingen-sectie").style.display = "block";
+
+        document.getElementById("status-text").innerText = "READY TO RUMBLE?";
+        updateScherm("READY TO RUMBLE?", "status-klaar", 0);
+        document.getElementById("timer-display").innerText = "00:00";
+        updateCirkel();
+
+        document.getElementById("btn-start").style.display = "block";
+        document.getElementById("btn-pauze").style.display = "none";
+        document.getElementById("btn-hervat").style.display = "none";
+        document.getElementById("btn-reset").style.display = "none";
+        document.getElementById("btn-stop").style.display = "none";
+    }
+
+    function resetTimer() {
+        stopTimer();
+    }
+
+    function updateScherm(statusTxt, kleurKlasse, ronde) {
+        document.getElementById("status-text").innerText = statusTxt;
+        if(ronde === 0) {
+            document.getElementById("ronde-display").innerText = "Ronde: 0 / 0";
+        } else {
+            document.getElementById("ronde-display").innerText = "Ronde: " + ronde + " / " + totaalRondes;
+        }
+        
+        let balk = document.getElementById("progressie-balk");
+        balk.className = "cirkel-progressie " + kleurKlasse;
+        
+        let txt = document.getElementById("timer-display");
+        txt.className = "timer-box " + kleurKlasse;
+    }
+</script>
+
+</body>
+</html>
