@@ -1,369 +1,796 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym Tabata Timer - Background & Sound Fixed</title>
-    <style>
-        body { 
-            font-family: 'Arial', sans-serif; 
-            text-align: center; 
-            background-color: #111111; 
-            color: white;
-            padding-top: 20px; 
-        }
-        .container {
-            max-width: 450px;
-            margin: 0 auto;
-            background: #222222;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0px 8px 25px rgba(0,0,0,0.7);
-        }
-        
-        #instellingen-sectie {
-            transition: all 0.2s ease;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GYM TIMER">
+<title>GYM TIMER</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap');
 
-        .timer-container {
-            position: relative;
-            width: 270px;
-            height: 270px;
-            margin: 20px auto;
-        }
-        
-        .timer-svg {
-            transform: scaleX(-1) rotate(-90deg); 
-            width: 100%;
-            height: 100%;
-        }
-        .cirkel-bg {
-            fill: none;
-            stroke: #2c2c2c;
-            stroke-width: 4.5; 
-        }
-        .cirkel-progressie {
-            fill: none;
-            stroke-width: 4.5; 
-            stroke-linecap: round;
-            transition: none; 
-        }
-        
-        .timer-text-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            width: 100%;
-        }
-        .timer-box { 
-            font-size: 4.6rem; 
-            font-weight: bold; 
-            font-family: 'Courier New', Courier, monospace;
-        }
-        
-        .status-getready { stroke: #3498db; color: #3498db; } 
-        .status-werk { stroke: #2ecc71; color: #2ecc71; }     
-        .status-rust { stroke: #e74c3c; color: #e74c3c; }     
-        .status-klaar { stroke: #3498db; color: #3498db; }    
+:root {
+  --work:  #00ff88;
+  --rest:  #ff2244;
+  --ready: #2979ff;
+  --bg:    #080808;
+  --card:  #101010;
+  --dim:   #1a1a1a;
+  --muted: #444;
+  --text:  #efefef;
+  --current: var(--ready);
+}
 
-        .input-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 12px 0;
-        }
-        .input-row label { flex: 1; text-align: left; font-weight: bold; color: #bbb; }
-        .input-fields { display: flex; gap: 5px; }
-        input { width: 55px; padding: 10px; font-size: 1.1rem; border-radius: 8px; border: none; text-align: center; background: #333; color: white; }
-        
-        .button-group {
-            display: flex;
-            justify-content: center;
-            margin-top: 25px;
-            gap: 10px;
-        }
-        button { 
-            font-size: 1.1rem; 
-            padding: 14px 22px; 
-            cursor: pointer; 
-            border: none; 
-            border-radius: 8px; 
-            color: white;
-            font-weight: bold;
-            min-width: 110px;
-            box-shadow: 0px 4px 6px rgba(0,0,0,0.4);
-        }
-        .btn-start { background-color: #2ecc71; }
-        .btn-pauze { background-color: #e67e22; }
-        .btn-hervat { background-color: #3498db; }
-        .btn-stop { background-color: #e74c3c; }
-        .btn-reset { background-color: #95a5a6; }
-        button:hover { opacity: 0.9; }
-        .info { font-size: 1.4rem; margin: 5px 0; font-weight: bold; }
-    </style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Bebas Neue', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── HEADER ─────────────────────────────────────────── */
+.header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 0;
+}
+.logo {
+  font-size: 1.6rem;
+  letter-spacing: 6px;
+  color: var(--text);
+}
+.logo span { color: var(--work); }
+
+.wake-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: #161616;
+  border: 1px solid #222;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+}
+.wake-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.4s;
+}
+.wake-dot.on {
+  background: var(--work);
+  box-shadow: 0 0 6px var(--work);
+  animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── SETTINGS ────────────────────────────────────────── */
+.settings {
+  width: 100%;
+  padding: 14px 22px 0;
+  overflow: hidden;
+  max-height: 220px;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
+  opacity: 1;
+}
+.settings.hidden { max-height: 0; opacity: 0; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #181818;
+}
+.row:last-child { border-bottom: none; }
+.row label {
+  font-size: 0.95rem;
+  letter-spacing: 3px;
+  color: #666;
+}
+.inputs { display: flex; align-items: center; gap: 6px; }
+.inputs span {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+input[type="number"] {
+  width: 50px;
+  padding: 7px 4px;
+  background: #161616;
+  border: 1px solid #252525;
+  border-radius: 7px;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1rem;
+  text-align: center;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input:focus { outline: none; border-color: var(--ready); }
+
+/* ── MAIN STAGE ──────────────────────────────────────── */
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 20px;
+  gap: 0;
+}
+
+/* ── COUNTDOWN SPLASH (3-2-1) ───────────────────────── */
+#countdown-splash {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+}
+#countdown-splash.visible { display: flex; }
+
+.splash-number {
+  font-size: min(45vw, 220px);
+  line-height: 1;
+  color: var(--ready);
+  text-shadow: 0 0 60px rgba(41,121,255,0.5);
+  animation: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes pop-in {
+  from { transform: scale(1.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.splash-label {
+  font-size: 1.2rem;
+  letter-spacing: 8px;
+  color: #555;
+  margin-top: -10px;
+}
+
+/* ── STATUS + ROUND ─────────────────────────────────── */
+.status-wrap {
+  text-align: center;
+  margin-bottom: 6px;
+}
+#status-text {
+  font-size: clamp(2rem, 10vw, 3rem);
+  letter-spacing: 5px;
+  color: var(--current);
+  transition: color 0.25s;
+}
+#round-text {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 4px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── RING ────────────────────────────────────────────── */
+.ring-wrap {
+  position: relative;
+  width: min(80vw, 320px);
+  height: min(80vw, 320px);
+}
+.ring-svg {
+  width: 100%; height: 100%;
+  /* rotate(-90deg) starts at top. scaleX(-1) flips so arc goes clockwise (drains clockwise) */
+  transform: rotate(-90deg) scaleX(-1);
+  overflow: visible;
+}
+.ring-bg {
+  fill: none;
+  stroke: #1c1c1c;
+  stroke-width: 4.5;
+}
+.ring-track {
+  fill: none;
+  stroke: var(--current);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  transition: stroke 0.3s ease;
+}
+/* Glow duplicate */
+.ring-glow {
+  fill: none;
+  stroke: var(--current);
+  stroke-width: 8;
+  stroke-linecap: round;
+  opacity: 0.18;
+  transition: stroke 0.3s ease;
+}
+
+.timer-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#timer-display {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(2.4rem, 12vw, 4.4rem);
+  color: var(--current);
+  transition: color 0.25s, font-size 0.2s ease;
+  letter-spacing: 2px;
+  line-height: 1;
+  text-shadow: 0 0 24px currentColor;
+}
+#timer-display.big {
+  font-size: clamp(2.8rem, 14vw, 5.2rem);
+  letter-spacing: 2px;
+}
+
+/* ── BUTTONS ─────────────────────────────────────────── */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+button {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #fff;
+  min-width: 100px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  transition: transform 0.1s, opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active { transform: scale(0.94); }
+button:hover  { opacity: 0.85; }
+.btn-start  { background: #00c853; color: #000; }
+.btn-pause  { background: #e65100; }
+.btn-resume { background: #1565c0; }
+.btn-stop   { background: #b71c1c; }
+.btn-reset  { background: #1e1e1e; border: 1px solid #2a2a2a; }
+
+/* ── PWA TIP ─────────────────────────────────────────── */
+.tip {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 1.5px;
+  color: #272727;
+  text-align: center;
+  padding: 12px 20px;
+  line-height: 1.7;
+}
+</style>
 </head>
 <body>
 
-<div class="container">
-    <h1>GYM TIMER</h1>
-    
-    <audio id="snd-countdown" src="countdown.mp3" preload="auto"></audio>
-    <audio id="snd-wissel" src="wissel.mp3" preload="auto"></audio>
+<!-- COUNTDOWN SPLASH -->
+<div id="countdown-splash">
+  <div class="splash-number" id="splash-num">3</div>
+  <div class="splash-label">GET READY</div>
+  <button class="btn-stop splash-stop" onclick="onStop()" style="margin-top:32px;min-width:130px;font-size:1.2rem;letter-spacing:3px;padding:15px 28px;">STOP</button>
+</div>
 
-    <div id="instellingen-sectie" style="display: block;">
-        <div class="input-row">
-            <label>Werktijd:</label>
-            <div class="input-fields">
-                <input type="number" id="input-werk-min" value="0" min="0"> <span>m</span>
-                <input type="number" id="input-werk-sec" value="20" min="0" max="59"> <span>s</span>
-            </div>
-        </div>
-        <div class="input-row">
-            <label>Rusttijd:</label>
-            <div class="input-fields">
-                <input type="number" id="input-rust-min" value="0" min="0"> <span>m</span>
-                <input type="number" id="input-rust-sec" value="10" min="0" max="59"> <span>s</span>
-            </div>
-        </div>
-        <div class="input-row">
-            <label>Rondes:</label>
-            <input type="number" id="input-rondes" value="8" min="1">
-        </div>
-        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
-    </div>
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">GYM <span>TIMER</span></div>
+  <div class="wake-pill">
+    <div class="wake-dot" id="wake-dot"></div>
+    <span id="wake-lbl">SCHERM AAN: UIT</span>
+  </div>
+</div>
 
-    <div class="info" id="status-text">READY TO RUMBLE?</div>
-    <div class="info" id="ronde-display">Ronde: 0 / 0</div>
-    
-    <div class="timer-container">
-        <svg class="timer-svg" viewBox="0 0 100 100">
-            <circle class="cirkel-bg" cx="50" cy="50" r="44"></circle>
-            <circle id="progressie-balk" class="cirkel-progressie status-klaar" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
-        </svg>
-        <div class="timer-text-box">
-            <div class="timer-box" id="timer-display">00:00</div>
-        </div>
+<!-- SETTINGS -->
+<div class="settings" id="settings">
+  <div class="row">
+    <label>WORK</label>
+    <div class="inputs">
+      <input type="number" id="werk-min" value="0" min="0"> <span>MIN</span>
+      <input type="number" id="werk-sec" value="20" min="0" max="59"> <span>SEC</span>
     </div>
-    
-    <div class="button-group">
-        <button id="btn-start" class="btn-start" onclick="startTimer()">Start</button>
-        <button id="btn-pauze" class="btn-pauze" onclick="pauzeTimer()" style="display: none;">Pauze</button>
-        <button id="btn-hervat" class="btn-hervat" onclick="startTimer()" style="display: none;">Hervat</button>
-        <button id="btn-reset" class="btn-reset" onclick="resetTimer()" style="display: none;">Reset</button>
-        <button id="btn-stop" class="btn-stop" onclick="stopTimer()" style="display: none;">Stop</button>
+  </div>
+  <div class="row">
+    <label>REST</label>
+    <div class="inputs">
+      <input type="number" id="rust-min" value="0" min="0"> <span>MIN</span>
+      <input type="number" id="rust-sec" value="10" min="0" max="59"> <span>SEC</span>
     </div>
+  </div>
+  <div class="row">
+    <label>ROUNDS</label>
+    <div class="inputs">
+      <input type="number" id="rondes" value="8" min="1">
+    </div>
+  </div>
+</div>
+
+<!-- STAGE -->
+<div class="stage">
+  <div class="status-wrap">
+    <div id="status-text">READY?</div>
+    <div id="round-text">— / —</div>
+  </div>
+
+  <div class="ring-wrap">
+    <svg class="ring-svg" viewBox="0 0 100 100">
+      <circle class="ring-bg"    cx="50" cy="50" r="44"/>
+      <circle class="ring-glow"  cx="50" cy="50" r="44" id="ring-glow"
+              stroke-dasharray="276.46" stroke-dashoffset="276.46"/>
+      <circle class="ring-track" cx="50" cy="50" r="44" id="ring-track"
+              stroke-dasharray="276.46" stroke-dashoffset="276.46"/>
+    </svg>
+    <div class="timer-center">
+      <div id="timer-display">00:00</div>
+    </div>
+  </div>
+
+  <div class="btn-row" id="btn-row">
+    <button id="btn-start"  class="btn-start"  onclick="onStart()">START</button>
+    <button id="btn-pause"  class="btn-pause"  onclick="onPause()"  style="display:none">PAUSE</button>
+    <button id="btn-resume" class="btn-resume" onclick="onResume()" style="display:none">RESUME</button>
+    <button id="btn-reset"  class="btn-reset"  onclick="onReset()"  style="display:none">RESET</button>
+    <button id="btn-stop"   class="btn-stop"   onclick="onStop()"   style="display:none">STOP</button>
+  </div>
+</div>
+
+<div class="tip" id="tip">
+  📱 SAFARI → DEEL → "ZET OP BEGINSCHERM" VOOR BESTE WERKING
 </div>
 
 <script>
-    let countdownLoop;
-    let seconden = 0;
-    let maxFaseSeconden = 0; 
-    let huidigeRonde = 1;
-    let totaalRondes = 0;
-    let isRunning = false; 
-    let huidigeFase = 'getready'; 
+/* ═══════════════════════════════════════════════════════════════
+   AUDIO ENGINE
+   Strategy for cutting through music on a phone speaker:
+   - Use SINE waves at frequencies 1800–3500 Hz — this is the
+     "presence" band phones amplify and where the ear is most
+     sensitive. Sawtooth/square at low freq get lost in music bass.
+   - Layer two sine tones a 5th apart for more "body" without mud.
+   - Hard-clip via WaveShaper to add harmonics that cut even more.
+   - No looping buffer — that kills Spotify on iOS.
+═══════════════════════════════════════════════════════════════ */
+let AC = null;
+let audioUnlocked = false;
 
-    // Tijdberekening variabelen voor de achtergrond-modus
-    let expectedEndTime;
-    let faseWerkTijd, faseRustTijd;
-    let laatstAfgespeeldeSeconde = -1;
+function ensureAudio() {
+  if (!AC) {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (AC.state === 'suspended') AC.resume();
+}
 
-    const CIRKEL_OMTREK = 2 * Math.PI * 44; 
+function unlockAudio() {
+  if (audioUnlocked) return;
+  ensureAudio();
+  const buf = AC.createBuffer(1, 1, AC.sampleRate);
+  const src = AC.createBufferSource();
+  src.buffer = buf;
+  src.connect(AC.destination);
+  src.start(0);
+  audioUnlocked = true;
+}
 
-    // MP3 speler functie die over Spotify heen mixt
-    function playGymAudio(type) {
-        let sound = (type === 'countdown') ? document.getElementById("snd-countdown") : document.getElementById("snd-wissel");
-        if (sound) {
-            sound.currentTime = 0;
-            // Dwing mobiele browsers om het af te spelen als media, zelfs in stille modus
-            let playPromise = sound.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.log("Audio afspelen mislukt door browserbeveiliging:", error);
-                });
-            }
-        }
+/*
+  Sounds — simple and clean, no layering tricks:
+  'tick'   — short sharp beep (3-2-1 and phase-end countdown)
+  'start'  — single punchy blast (work begins)
+  'switch' — slightly lower blast (rest begins)
+  'done'   — one long sustained tone, holds then fades
+*/
+function beep(type) {
+  ensureAudio();
+  const t = AC.currentTime;
+
+  if (type === 'tick') {
+    // Short, very high, instant — like a digital metronome click
+    singleBeep(3500, 0.9, t, 0.07);
+  }
+
+  else if (type === 'start') {
+    // One punchy high beep, slightly longer than tick
+    singleBeep(3000, 1.0, t, 0.14);
+  }
+
+  else if (type === 'switch') {
+    // One medium beep — different pitch from start so you hear the change
+    singleBeep(1800, 1.0, t, 0.18);
+  }
+
+  else if (type === 'done') {
+    // One long sustained tone — holds for 1.2s then fades out
+    // Deep enough to feel different from all the short beeps
+    singleBeep(880, 1.0, t, 1.2);
+  }
+}
+
+function singleBeep(freq, vol, startAt, dur) {
+  const osc  = AC.createOscillator();
+  const gain = AC.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, startAt);
+
+  // 3ms attack (sharp transient), hold, then clean exponential release
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.linearRampToValueAtTime(vol, startAt + 0.003);
+  gain.gain.setValueAtTime(vol, startAt + dur * 0.65);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
+
+  osc.connect(gain);
+  gain.connect(AC.destination);
+
+  osc.start(startAt);
+  osc.stop(startAt + dur + 0.01);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   WAKE LOCK
+═══════════════════════════════════════════════════════════════ */
+let wakeLock = null;
+async function reqWake() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      document.getElementById('wake-dot').classList.add('on');
+      document.getElementById('wake-lbl').textContent = 'SCHERM AAN: AAN';
+      wakeLock.addEventListener('release', () => {
+        document.getElementById('wake-dot').classList.remove('on');
+        document.getElementById('wake-lbl').textContent = 'SCHERM AAN: UIT';
+      });
+    } catch(e) {}
+  }
+}
+function dropWake() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   RING ANIMATION
+   The ring uses CSS animation (linear, exact duration) so it
+   sweeps perfectly smoothly — no per-frame JS jitter.
+═══════════════════════════════════════════════════════════════ */
+const CIRC = 2 * Math.PI * 44; // 276.46
+
+let ringAnim = null; // current CSS animation reference via style injection
+
+function startRingAnimation(durationSec) {
+  // Always starts from offset=0 (full ring) — used when a phase begins fresh
+  _animateRing(0, durationSec);
+}
+
+function resumeRingAnimation(durationSec) {
+  // Starts from wherever the ring was frozen at pause
+  const fromOffset = pausedOffset !== null ? pausedOffset : 0;
+  _animateRing(fromOffset, durationSec);
+  pausedOffset = null;
+}
+
+function _animateRing(fromOffset, durationSec) {
+  const track = document.getElementById('ring-track');
+  const glow  = document.getElementById('ring-glow');
+
+  track.style.animation = 'none';
+  glow.style.animation  = 'none';
+  track.style.strokeDashoffset = fromOffset;
+  glow.style.strokeDashoffset  = fromOffset;
+  // Force reflow so the browser registers the new start value
+  track.getBoundingClientRect();
+
+  const id = 'kf_' + Date.now();
+  const style = document.createElement('style');
+  style.id = id;
+  style.textContent = `
+    @keyframes ${id} {
+      from { stroke-dashoffset: ${fromOffset}; }
+      to   { stroke-dashoffset: ${CIRC}; }
+    }
+  `;
+  document.head.appendChild(style);
+  if (ringAnim) document.getElementById(ringAnim)?.remove();
+  ringAnim = id;
+
+  const anim = `${id} ${durationSec}s linear forwards`;
+  track.style.animation = anim;
+  glow.style.animation  = anim;
+}
+
+function stopRing(fillPercent = 0) {
+  const track = document.getElementById('ring-track');
+  const glow  = document.getElementById('ring-glow');
+  track.style.animation = 'none';
+  glow.style.animation  = 'none';
+  const offset = CIRC * (1 - fillPercent);
+  track.style.strokeDashoffset = offset;
+  glow.style.strokeDashoffset  = offset;
+}
+
+function setRingColor(phase) {
+  const c = phase === 'werk' ? 'var(--work)' :
+            phase === 'rust' ? 'var(--rest)' :
+                               'var(--ready)';
+  document.documentElement.style.setProperty('--current', c);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TIMER STATE
+═══════════════════════════════════════════════════════════════ */
+let loop = null;
+let isRunning   = false;
+let phase       = 'idle';   // idle | countdown | werk | rust | done
+let curRound    = 1;
+let totalRounds = 8;
+let werkSec     = 20;
+let rustSec     = 10;
+let phaseEndTime = 0;
+let phaseTotalSec = 0;
+let lastBeepSec = -1;
+
+function readInputs() {
+  werkSec     = (parseInt(document.getElementById('werk-min').value) * 60)
+              +  parseInt(document.getElementById('werk-sec').value);
+  rustSec     = (parseInt(document.getElementById('rust-min').value) * 60)
+              +  parseInt(document.getElementById('rust-sec').value);
+  totalRounds = parseInt(document.getElementById('rondes').value);
+  if (!werkSec) werkSec = 20;
+  if (!rustSec) rustSec = 10;
+  if (!totalRounds || totalRounds < 1) totalRounds = 1;
+}
+
+function fmt(s) {
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+
+function setStatus(text, ph) {
+  document.getElementById('status-text').textContent = text;
+  setRingColor(ph);
+  document.getElementById('timer-display').style.color = 'var(--current)';
+}
+
+function setRound(cur, tot) {
+  document.getElementById('round-text').textContent =
+    (cur > 0 && tot > 0) ? 'ROUND ' + cur + ' / ' + tot : '— / —';
+}
+
+function showTime(sec) {
+  document.getElementById('timer-display').textContent = fmt(sec);
+}
+
+/* ─── Countdown splash (3-2-1) ────────────────────────── */
+let splashTimer = null;
+function runCountdown(cb) {
+  const splash = document.getElementById('countdown-splash');
+  const numEl  = document.getElementById('splash-num');
+  splash.classList.add('visible');
+  let n = 3;
+
+  function tick() {
+    numEl.textContent = n;
+    // Restart animation
+    numEl.style.animation = 'none';
+    numEl.getBoundingClientRect();
+    numEl.style.animation = '';
+
+    beep('tick');
+
+    if (n === 0) {
+      splash.classList.remove('visible');
+      cb();
+      return;
+    }
+    n--;
+    splashTimer = setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+/* ─── Phase transitions ───────────────────────────────── */
+function beginPhase(ph, sec, round) {
+  phase         = ph;
+  curRound      = round;
+  phaseTotalSec = sec;
+  phaseEndTime  = Date.now() + sec * 1000;
+  lastBeepSec   = sec + 1;
+
+  setRingColor(ph);
+  startRingAnimation(sec);
+
+  if (ph === 'werk') {
+    setStatus('WORK!', 'werk');
+    document.getElementById('timer-display').classList.add('big');
+    beep('start');
+  } else if (ph === 'rust') {
+    setStatus('REST', 'rust');
+    document.getElementById('timer-display').classList.remove('big');
+    beep('switch');
+  }
+  setRound(round, totalRounds);
+  showTime(sec);
+}
+
+function startMainLoop() {
+  clearInterval(loop);
+  loop = setInterval(() => {
+    const remaining = Math.max(0, Math.ceil((phaseEndTime - Date.now()) / 1000));
+
+    // Countdown beeps 3-2-1
+    if (remaining > 0 && remaining <= 3 && remaining !== lastBeepSec) {
+      beep('tick');
+      lastBeepSec = remaining;
     }
 
-    function formatteerTijd(totaleSeconden) {
-        let mins = Math.floor(totaleSeconden / 60);
-        let secs = totaleSeconden % 60;
-        return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-    }
+    showTime(remaining);
 
-    function updateCirkel() {
-        let balk = document.getElementById("progressie-balk");
-        if (huidigeFase === 'getready') {
-            balk.style.strokeDashoffset = 0;
-            return;
-        }
-        if (maxFaseSeconden > 0) {
-            let percentageGeweest = (maxFaseSeconden - seconden) / maxFaseSeconden;
-            let offset = CIRKEL_OMTREK * percentageGeweest;
-            balk.style.strokeDashoffset = offset;
+    if (remaining <= 0) {
+      // Phase complete
+      if (phase === 'werk') {
+        beginPhase('rust', rustSec, curRound);
+      } else if (phase === 'rust') {
+        const nextRound = curRound + 1;
+        if (nextRound > totalRounds) {
+          finishWorkout();
         } else {
-            balk.style.strokeDashoffset = 0;
+          beginPhase('werk', werkSec, nextRound);
         }
+      }
     }
+  }, 50);
+}
 
-    function startTimer() {
-        if (isRunning) return; 
-        isRunning = true;
+function finishWorkout() {
+  clearInterval(loop);
+  isRunning = false;
+  phase = 'done';
+  stopRing(0);
+  beep('done');
+  setStatus('DONE!', 'ready');
+  setRound(totalRounds, totalRounds);
+  document.getElementById('timer-display').textContent = 'DONE';
+  document.getElementById('timer-display').classList.remove('big');
+  dropWake();
+  btnState('done');
+}
 
-        // Activeer audio-elementen via de start-klik (verplicht op iOS/Android)
-        document.getElementById("snd-countdown").play().then(() => { document.getElementById("snd-countdown").pause(); }).catch(()=>{});
-        document.getElementById("snd-wissel").play().then(() => { document.getElementById("snd-wissel").pause(); }).catch(()=>{});
+/* ═══════════════════════════════════════════════════════════════
+   BUTTON ACTIONS
+═══════════════════════════════════════════════════════════════ */
+function btnState(state) {
+  const show = id => document.getElementById(id).style.display = 'block';
+  const hide = id => document.getElementById(id).style.display = 'none';
+  ['btn-start','btn-pause','btn-resume','btn-reset','btn-stop'].forEach(hide);
+  if (state === 'idle')    { show('btn-start'); }
+  if (state === 'running') { show('btn-pause'); show('btn-stop'); }
+  if (state === 'paused')  { show('btn-resume'); show('btn-reset'); }
+  if (state === 'done')    { show('btn-reset'); }
+}
 
-        document.getElementById("instellingen-sectie").style.display = "none";
-        document.getElementById("btn-start").style.display = "none";
-        document.getElementById("btn-hervat").style.display = "none";
-        document.getElementById("btn-reset").style.display = "none";
-        document.getElementById("btn-pauze").style.display = "block";
-        document.getElementById("btn-stop").style.display = "block";
+function onStart() {
+  unlockAudio();  // unlock iOS audio on user gesture
+  readInputs();
 
-        faseWerkTijd = (parseInt(document.getElementById("input-werk-min").value) * 60) + parseInt(document.getElementById("input-werk-sec").value);
-        faseRustTijd = (parseInt(document.getElementById("input-rust-min").value) * 60) + parseInt(document.getElementById("input-rust-sec").value);
-        totaalRondes = parseInt(document.getElementById("input-rondes").value);
+  document.getElementById('settings').classList.add('hidden');
+  document.getElementById('tip').style.display = 'none';
+  btnState('running');
+  reqWake();
 
-        if (seconden === 0 && huidigeRonde === 1 && huidigeFase === 'getready') {
-            seconden = 3; 
-            maxFaseSeconden = 3;
-            updateScherm("GET READY!", "status-getready", 1);
-        } else {
-            let kleurClass = "status-" + huidigeFase;
-            updateScherm(huidigeFase.toUpperCase() + "!", kleurClass, huidigeRonde);
-        }
+  isRunning = true;
+  curRound = 1;
+  setRound(1, totalRounds);
+  setStatus('GET READY', 'ready');
+  stopRing(1);
 
-        // Bepaal exact hoe laat deze fase afgelopen moet zijn op basis van de interne klok
-        expectedEndTime = Date.now() + (seconden * 1000);
-        laatstAfgespeeldeSeconde = seconden;
+  runCountdown(() => {
+    beginPhase('werk', werkSec, 1);
+    startMainLoop();
+  });
+}
 
-        updateCirkel();
-        document.getElementById("timer-display").innerText = formatteerTijd(seconden);
+let pausedOffset = null; // stroke-dashoffset value frozen at pause
 
-        // De ultra-precieze tijdlus die herstelt als het scherm uit is geweest
-        countdownLoop = setInterval(function() {
-            let overgeblevenTijdMilli = expectedEndTime - Date.now();
-            seconden = Math.ceil(overgeblevenTijdMilli / 1000);
+function onPause() {
+  clearInterval(loop);
+  clearTimeout(splashTimer);
+  document.getElementById('countdown-splash').classList.remove('visible');
 
-            if (seconden < 0) seconden = 0;
+  // Read the COMPUTED (mid-animation) offset value and freeze it
+  const track = document.getElementById('ring-track');
+  const glow  = document.getElementById('ring-glow');
+  const liveOffset = parseFloat(getComputedStyle(track).strokeDashoffset);
+  pausedOffset = isNaN(liveOffset) ? 0 : liveOffset;
 
-            document.getElementById("timer-display").innerText = formatteerTijd(seconden);
-            updateCirkel();
+  track.style.animation = 'none';
+  glow.style.animation  = 'none';
+  track.style.strokeDashoffset = pausedOffset;
+  glow.style.strokeDashoffset  = pausedOffset;
 
-            // Voorkom dubbele piepjes bij vertragingen
-            if (seconden > 0 && seconden <= 3 && seconden !== laatstAfgespeeldeSeconde) {
-                playGymAudio('countdown');
-                laatstAfgespeeldeSeconde = seconden;
-            }
+  isRunning = false;
+  dropWake();
+  setStatus('PAUSED', phase);
+  document.getElementById('settings').classList.remove('hidden');
+  btnState('paused');
+}
 
-            if (seconden <= 0) {
-                playGymAudio('wissel');
+function onResume() {
+  unlockAudio();
+  document.getElementById('settings').classList.add('hidden');
+  isRunning = true;
+  reqWake();
 
-                if (huidigeFase === 'getready') {
-                    huidigeFase = 'werk';
-                    seconden = faseWerkTijd;
-                    maxFaseSeconden = faseWerkTijd;
-                    updateScherm("WERK!", "status-werk", huidigeRonde);
-                } 
-                else if (huidigeFase === 'werk') {
-                    huidigeFase = 'rust';
-                    seconden = faseRustTijd;
-                    maxFaseSeconden = faseRustTijd;
-                    updateScherm("RUST!", "status-rust", huidigeRonde);
-                } 
-                else if (huidigeFase === 'rust') {
-                    huidigeRonde++;
-                    
-                    if (huidigeRonde > totaalRondes) {
-                        clearInterval(countdownLoop);
-                        isRunning = false;
-                        maxFaseSeconden = 0;
-                        updateScherm("KLAAR!", "status-klaar", totaalRondes);
-                        document.getElementById("timer-display").innerText = "DONE";
-                        updateCirkel();
-                        stopTimer(); 
-                        return;
-                    }
-                    
-                    huidigeFase = 'werk';
-                    seconden = faseWerkTijd;
-                    maxFaseSeconden = faseWerkTijd;
-                    updateScherm("WERK!", "status-werk", huidigeRonde);
-                }
-                
-                expectedEndTime = Date.now() + (seconden * 1000);
-                laatstAfgespeeldeSeconde = seconden;
-                document.getElementById("timer-display").innerText = formatteerTijd(seconden);
-                updateCirkel();
-            }
-        }, 200); // Checkt 5 keer per seconde voor maximale nauwkeurigheid bij achtergrond-hervatting
-    }
+  // Remaining seconds based on wall clock
+  const remaining = Math.max(1, Math.ceil((phaseEndTime - Date.now()) / 1000));
+  // Rebase end time from now
+  phaseEndTime = Date.now() + remaining * 1000;
 
-    function pauzeTimer() {
-        clearInterval(countdownLoop);
-        isRunning = false;
-        document.getElementById("status-text").innerText = "GEPAUZEERD";
-        document.getElementById("instellingen-sectie").style.display = "block";
-        document.getElementById("btn-pauze").style.display = "none";
-        document.getElementById("btn-hervat").style.display = "block";
-        document.getElementById("btn-reset").style.display = "block";
-    }
+  // Resume ring FROM the frozen offset position
+  resumeRingAnimation(remaining);
 
-    function stopTimer() {
-        clearInterval(countdownLoop);
-        isRunning = false;
-        seconden = 0;
-        maxFaseSeconden = 0;
-        huidigeRonde = 1;
-        huidigeFase = 'getready';
-        laatstAfgespeeldeSeconde = -1;
-        
-        document.getElementById("instellingen-sectie").style.display = "block";
-        document.getElementById("status-text").innerText = "READY TO RUMBLE?";
-        updateScherm("READY TO RUMBLE?", "status-klaar", 0);
-        document.getElementById("timer-display").innerText = "00:00";
-        updateCirkel();
+  if (phase === 'werk') setStatus('WORK!', 'werk');
+  else if (phase === 'rust') setStatus('REST', 'rust');
 
-        document.getElementById("btn-start").style.display = "block";
-        document.getElementById("btn-pauze").style.display = "none";
-        document.getElementById("btn-hervat").style.display = "none";
-        document.getElementById("btn-reset").style.display = "none";
-        document.getElementById("btn-stop").style.display = "none";
-    }
+  btnState('running');
+  startMainLoop();
+}
 
-    function resetTimer() {
-        stopTimer();
-    }
+function onStop() {
+  clearInterval(loop);
+  clearTimeout(splashTimer);
+  document.getElementById('countdown-splash').classList.remove('visible');
+  isRunning = false;
+  phase = 'idle';
+  dropWake();
+  reset();
+}
 
-    function updateScherm(statusTxt, kleurKlasse, ronde) {
-        document.getElementById("status-text").innerText = statusTxt;
-        if(ronde === 0) {
-            document.getElementById("ronde-display").innerText = "Ronde: 0 / 0";
-        } else {
-            document.getElementById("ronde-display").innerText = "Ronde: " + ronde + " / " + totaalRondes;
-        }
-        
-        let balk = document.getElementById("progressie-balk");
-        balk.className = "cirkel-progressie " + kleurKlasse;
-        
-        let txt = document.getElementById("timer-display");
-        txt.className = "timer-box " + kleurKlasse;
-    }
+function onReset() { onStop(); }
 
-    // Automatische synchronisatie zodra de app weer op de voorgrond komt
-    document.addEventListener("visibilitychange", function() {
-        if (!document.hidden && isRunning) {
-            let overgeblevenTijdMilli = expectedEndTime - Date.now();
-            seconden = Math.ceil(overgeblevenTijdMilli / 1000);
-            if (seconden < 0) seconden = 0;
-            document.getElementById("timer-display").innerText = formatteerTijd(seconden);
-            updateCirkel();
-        }
-    });
+function reset() {
+  stopRing(1);
+  setStatus('READY?', 'ready');
+  setRound(0, 0);
+  showTime(0);
+  document.getElementById('timer-display').textContent = '00:00';
+  document.getElementById('timer-display').classList.remove('big');
+  document.getElementById('settings').classList.remove('hidden');
+  document.getElementById('tip').style.display = 'block';
+  btnState('idle');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISIBILITY / WAKE LOCK recovery
+═══════════════════════════════════════════════════════════════ */
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && isRunning) {
+    await reqWake();
+  }
+});
+
+// Init
+reset();
 </script>
-
 </body>
 </html>
