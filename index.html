@@ -6,7 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GYM TIMER">
+<meta name="theme-color" content="#080808">
 <title>GYM TIMER</title>
+<link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22GYM%20TIMER%22%2C%22short_name%22%3A%22GYM%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23080808%22%2C%22theme_color%22%3A%22%23080808%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%3D%25270%25200%252096%252096%2527%253E%253Crect%2520width%3D%252796%2527%2520height%3D%252796%2527%2520fill%3D%2527%2523080808%2527%2F%253E%253Ctext%2520x%3D%252748%2527%2520y%3D%252768%2527%2520font-size%3D%252760%2527%2520text-anchor%3D%2527middle%2527%2520fill%3D%2527%252300ff88%2527%253E%25E2%259A%25A1%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%2296x96%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap');
 
@@ -173,7 +175,7 @@ input:focus { outline: none; border-color: var(--ready); }
 /* ── STATUS + ROUND ─────────────────────────────────── */
 .status-wrap {
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 #status-text {
   font-size: clamp(2rem, 10vw, 3rem);
@@ -182,12 +184,19 @@ input:focus { outline: none; border-color: var(--ready); }
   transition: color 0.25s;
 }
 #round-text {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 0.85rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(1.4rem, 7vw, 2rem);
   letter-spacing: 4px;
-  color: var(--muted);
-  margin-top: 2px;
+  margin-top: 4px;
 }
+#round-text .cur {
+  color: var(--current);
+  font-size: 1.3em;
+  transition: color 0.25s;
+  text-shadow: 0 0 16px var(--current);
+}
+#round-text .sep { color: #333; margin: 0 3px; }
+#round-text .tot { color: #555; }
 
 /* ── RING ────────────────────────────────────────────── */
 .ring-wrap {
@@ -333,7 +342,7 @@ button:hover  { opacity: 0.85; }
 <div class="stage">
   <div class="status-wrap">
     <div id="status-text">READY?</div>
-    <div id="round-text">— / —</div>
+    <div id="round-text"><span class="cur">—</span><span class="sep">/</span><span class="tot">—</span></div>
   </div>
 
   <div class="ring-wrap">
@@ -359,92 +368,123 @@ button:hover  { opacity: 0.85; }
 </div>
 
 <div class="tip" id="tip">
-  📱 SAFARI → DEEL → "ZET OP BEGINSCHERM" VOOR BESTE WERKING
+  📲 INSTALLEER ALS APP: SAFARI → <strong style="color:#333">□↑</strong> → "ZET OP BEGINSCHERM"<br>
+  DAN WERKT AUDIO OOK ALS SCHERM DIMMT
 </div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════
-   AUDIO ENGINE
-   Strategy for cutting through music on a phone speaker:
-   - Use SINE waves at frequencies 1800–3500 Hz — this is the
-     "presence" band phones amplify and where the ear is most
-     sensitive. Sawtooth/square at low freq get lost in music bass.
-   - Layer two sine tones a 5th apart for more "body" without mud.
-   - Hard-clip via WaveShaper to add harmonics that cut even more.
-   - No looping buffer — that kills Spotify on iOS.
+   AUDIO ENGINE — iOS background-safe
+   
+   The problem: iOS suspends AudioContext when the app goes to
+   background or screen dims, even in PWA mode.
+   
+   The fix: Once the user taps START (gesture unlocks audio),
+   we schedule a recurring 1-sample silent buffer every 20s.
+   This "pings" the audio session just often enough to keep it
+   alive without claiming audio focus — so Spotify keeps playing.
+   
+   Unlike a looping buffer, this approach:
+   - Does NOT interrupt background music (uses same session)
+   - Survives iOS background throttling
+   - Costs almost zero CPU
 ═══════════════════════════════════════════════════════════════ */
 let AC = null;
 let audioUnlocked = false;
+let keepAliveTimer = null;
 
 function ensureAudio() {
   if (!AC) {
-    AC = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)({
+        // 'ambient' category on iOS = mixes with other audio, doesn't duck Spotify
+        latencyHint: 'interactive'
+      });
+    } catch(e) {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+    }
   }
   if (AC.state === 'suspended') AC.resume();
+}
+
+function keepAlive() {
+  if (!AC || !isRunning) return;
+  if (AC.state === 'suspended') AC.resume();
+  // Schedule a 1-sample silent buffer — just enough to ping the session
+  try {
+    const buf = AC.createBuffer(1, 1, AC.sampleRate);
+    const src = AC.createBufferSource();
+    src.buffer = buf;
+    src.connect(AC.destination);
+    src.start();
+  } catch(e) {}
+  // Reschedule — every 20s is enough to prevent iOS from closing the session
+  keepAliveTimer = setTimeout(keepAlive, 20000);
+}
+
+function startKeepAlive() {
+  stopKeepAlive();
+  keepAlive();
+}
+
+function stopKeepAlive() {
+  if (keepAliveTimer) { clearTimeout(keepAliveTimer); keepAliveTimer = null; }
 }
 
 function unlockAudio() {
   if (audioUnlocked) return;
   ensureAudio();
+  // Play silent primer on the gesture — this opens the iOS audio session
   const buf = AC.createBuffer(1, 1, AC.sampleRate);
   const src = AC.createBufferSource();
   src.buffer = buf;
   src.connect(AC.destination);
   src.start(0);
   audioUnlocked = true;
+  startKeepAlive();
 }
 
+// Re-open audio session if page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && AC) {
+    AC.resume().catch(() => {});
+    if (isRunning) startKeepAlive();
+  }
+});
+
 /*
-  Sounds — simple and clean, no layering tricks:
-  'tick'   — short sharp beep (3-2-1 and phase-end countdown)
-  'start'  — single punchy blast (work begins)
-  'switch' — slightly lower blast (rest begins)
-  'done'   — one long sustained tone, holds then fades
+  Sounds — clean single tones:
+  'tick'   — short sharp beep (3-2-1 countdown and end-of-phase 3-2-1)
+  'start'  — one punchy beep when WORK begins
+  'switch' — different pitch when REST begins
+  'done'   — one long sustained tone to signal workout complete
 */
 function beep(type) {
   ensureAudio();
+  if (AC.state === 'suspended') { AC.resume(); }
   const t = AC.currentTime;
 
-  if (type === 'tick') {
-    // Short, very high, instant — like a digital metronome click
-    singleBeep(3500, 0.9, t, 0.07);
-  }
-
-  else if (type === 'start') {
-    // One punchy high beep, slightly longer than tick
-    singleBeep(3000, 1.0, t, 0.14);
-  }
-
-  else if (type === 'switch') {
-    // One medium beep — different pitch from start so you hear the change
-    singleBeep(1800, 1.0, t, 0.18);
-  }
-
-  else if (type === 'done') {
-    // One long sustained tone — holds for 1.2s then fades out
-    // Deep enough to feel different from all the short beeps
-    singleBeep(880, 1.0, t, 1.2);
-  }
+  if      (type === 'tick')   singleBeep(3500, 0.9, t, 0.07);
+  else if (type === 'start')  singleBeep(3000, 1.0, t, 0.14);
+  else if (type === 'switch') singleBeep(1800, 1.0, t, 0.18);
+  else if (type === 'done')   singleBeep(880,  1.0, t, 1.2);
 }
 
 function singleBeep(freq, vol, startAt, dur) {
-  const osc  = AC.createOscillator();
-  const gain = AC.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, startAt);
-
-  // 3ms attack (sharp transient), hold, then clean exponential release
-  gain.gain.setValueAtTime(0.0001, startAt);
-  gain.gain.linearRampToValueAtTime(vol, startAt + 0.003);
-  gain.gain.setValueAtTime(vol, startAt + dur * 0.65);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
-
-  osc.connect(gain);
-  gain.connect(AC.destination);
-
-  osc.start(startAt);
-  osc.stop(startAt + dur + 0.01);
+  try {
+    const osc  = AC.createOscillator();
+    const gain = AC.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.linearRampToValueAtTime(vol, startAt + 0.003);
+    gain.gain.setValueAtTime(vol, startAt + dur * 0.65);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
+    osc.connect(gain);
+    gain.connect(AC.destination);
+    osc.start(startAt);
+    osc.stop(startAt + dur + 0.01);
+  } catch(e) {}
 }
 
 
@@ -573,8 +613,12 @@ function setStatus(text, ph) {
 }
 
 function setRound(cur, tot) {
-  document.getElementById('round-text').textContent =
-    (cur > 0 && tot > 0) ? 'ROUND ' + cur + ' / ' + tot : '— / —';
+  const el = document.getElementById('round-text');
+  if (cur > 0 && tot > 0) {
+    el.innerHTML = `<span class="cur">${cur}</span><span class="sep">/</span><span class="tot">${tot}</span>`;
+  } else {
+    el.innerHTML = `<span class="cur">—</span><span class="sep">/</span><span class="tot">—</span>`;
+  }
 }
 
 function showTime(sec) {
@@ -762,6 +806,7 @@ function onStop() {
   document.getElementById('countdown-splash').classList.remove('visible');
   isRunning = false;
   phase = 'idle';
+  stopKeepAlive();
   dropWake();
   reset();
 }
@@ -781,7 +826,8 @@ function reset() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   VISIBILITY / WAKE LOCK recovery
+   VISIBILITY — wake lock recovery
+   (Audio visibilitychange is handled in the audio engine above)
 ═══════════════════════════════════════════════════════════════ */
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden && isRunning) {
