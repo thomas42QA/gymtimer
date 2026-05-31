@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym Tabata Timer - Ultimate Edition</title>
+    <title>Gym Tabata Timer - Background & Sound Fixed</title>
     <style>
         body { 
             font-family: 'Arial', sans-serif; 
@@ -21,12 +21,10 @@
             box-shadow: 0px 8px 25px rgba(0,0,0,0.7);
         }
         
-        /* Instellingen sectie */
         #instellingen-sectie {
             transition: all 0.2s ease;
         }
 
-        /* De Ronde Klok Container */
         .timer-container {
             position: relative;
             width: 270px;
@@ -34,7 +32,6 @@
             margin: 20px auto;
         }
         
-        /* SVG Cirkel Styling */
         .timer-svg {
             transform: scaleX(-1) rotate(-90deg); 
             width: 100%;
@@ -43,16 +40,15 @@
         .cirkel-bg {
             fill: none;
             stroke: #2c2c2c;
-            stroke-width: 4.5; /* Aangepast naar 4.5 */
+            stroke-width: 4.5; 
         }
         .cirkel-progressie {
             fill: none;
-            stroke-width: 4.5; /* Aangepast naar 4.5 */
+            stroke-width: 4.5; 
             stroke-linecap: round;
             transition: none; 
         }
         
-        /* Digitale tijd midden in de cirkel */
         .timer-text-box {
             position: absolute;
             top: 50%;
@@ -62,12 +58,11 @@
             width: 100%;
         }
         .timer-box { 
-            font-size: 4.6rem; /* Groter gemaakt zodat het eruit springt */
+            font-size: 4.6rem; 
             font-weight: bold; 
             font-family: 'Courier New', Courier, monospace;
         }
         
-        /* Kleurschema (Geel is nu Blauw, Werk = Groen, Rust = Rood) */
         .status-getready { stroke: #3498db; color: #3498db; } 
         .status-werk { stroke: #2ecc71; color: #2ecc71; }     
         .status-rust { stroke: #e74c3c; color: #e74c3c; }     
@@ -114,6 +109,9 @@
 <div class="container">
     <h1>GYM TIMER</h1>
     
+    <audio id="snd-countdown" src="countdown.mp3" preload="auto"></audio>
+    <audio id="snd-wissel" src="wissel.mp3" preload="auto"></audio>
+
     <div id="instellingen-sectie" style="display: block;">
         <div class="input-row">
             <label>Werktijd:</label>
@@ -159,7 +157,7 @@
 </div>
 
 <script>
-    let countdown;
+    let countdownLoop;
     let seconden = 0;
     let maxFaseSeconden = 0; 
     let huidigeRonde = 1;
@@ -167,31 +165,25 @@
     let isRunning = false; 
     let huidigeFase = 'getready'; 
 
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const CIRKEL_OMTREK = 2 * Math.PI * 44; // ~276.46
+    // Tijdberekening variabelen voor de achtergrond-modus
+    let expectedEndTime;
+    let faseWerkTijd, faseRustTijd;
+    let laatstAfgespeeldeSeconde = -1;
 
-    // EXTRA DOORDINGEND HOGE GYM ALARM SNEIDT DOOR GELUID HEEN
-    function playGymBeep(type) {
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
-        osc.type = 'sawtooth'; 
-        
-        if (type === 'countdown') {
-            osc.frequency.setValueAtTime(1200, audioCtx.currentTime); // Krachtige hoge toon (1200 Hz)
-            gain.gain.setValueAtTime(0.7, audioCtx.currentTime); 
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15); 
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
-        } else if (type === 'wissel') {
-            osc.frequency.setValueAtTime(1600, audioCtx.currentTime); // Extreem schelle alarmsirene (1600 Hz) voor de wissel
-            gain.gain.setValueAtTime(0.95, audioCtx.currentTime); 
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8); 
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.8);
+    const CIRKEL_OMTREK = 2 * Math.PI * 44; 
+
+    // MP3 speler functie die over Spotify heen mixt
+    function playGymAudio(type) {
+        let sound = (type === 'countdown') ? document.getElementById("snd-countdown") : document.getElementById("snd-wissel");
+        if (sound) {
+            sound.currentTime = 0;
+            // Dwing mobiele browsers om het af te spelen als media, zelfs in stille modus
+            let playPromise = sound.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Audio afspelen mislukt door browserbeveiliging:", error);
+                });
+            }
         }
     }
 
@@ -203,13 +195,10 @@
 
     function updateCirkel() {
         let balk = document.getElementById("progressie-balk");
-        
-        // Geen aflopende cirkel tonen tijdens de getready (eerste 3 seconden) fase
         if (huidigeFase === 'getready') {
             balk.style.strokeDashoffset = 0;
             return;
         }
-
         if (maxFaseSeconden > 0) {
             let percentageGeweest = (maxFaseSeconden - seconden) / maxFaseSeconden;
             let offset = CIRKEL_OMTREK * percentageGeweest;
@@ -223,21 +212,22 @@
         if (isRunning) return; 
         isRunning = true;
 
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        // Activeer audio-elementen via de start-klik (verplicht op iOS/Android)
+        document.getElementById("snd-countdown").play().then(() => { document.getElementById("snd-countdown").pause(); }).catch(()=>{});
+        document.getElementById("snd-wissel").play().then(() => { document.getElementById("snd-wissel").pause(); }).catch(()=>{});
 
-        // Verberg de instellingen direct bij het starten
         document.getElementById("instellingen-sectie").style.display = "none";
-
         document.getElementById("btn-start").style.display = "none";
         document.getElementById("btn-hervat").style.display = "none";
         document.getElementById("btn-reset").style.display = "none";
         document.getElementById("btn-pauze").style.display = "block";
         document.getElementById("btn-stop").style.display = "block";
 
+        faseWerkTijd = (parseInt(document.getElementById("input-werk-min").value) * 60) + parseInt(document.getElementById("input-werk-sec").value);
+        faseRustTijd = (parseInt(document.getElementById("input-rust-min").value) * 60) + parseInt(document.getElementById("input-rust-sec").value);
+        totaalRondes = parseInt(document.getElementById("input-rondes").value);
+
         if (seconden === 0 && huidigeRonde === 1 && huidigeFase === 'getready') {
-            totaalRondes = parseInt(document.getElementById("input-rondes").value);
             seconden = 3; 
             maxFaseSeconden = 3;
             updateScherm("GET READY!", "status-getready", 1);
@@ -246,85 +236,92 @@
             updateScherm(huidigeFase.toUpperCase() + "!", kleurClass, huidigeRonde);
         }
 
-        updateCirkel();
+        // Bepaal exact hoe laat deze fase afgelopen moet zijn op basis van de interne klok
+        expectedEndTime = Date.now() + (seconden * 1000);
+        laatstAfgespeeldeSeconde = seconden;
 
-        countdown = setInterval(function() {
-            seconden--;
+        updateCirkel();
+        document.getElementById("timer-display").innerText = formatteerTijd(seconden);
+
+        // De ultra-precieze tijdlus die herstelt als het scherm uit is geweest
+        countdownLoop = setInterval(function() {
+            let overgeblevenTijdMilli = expectedEndTime - Date.now();
+            seconden = Math.ceil(overgeblevenTijdMilli / 1000);
+
+            if (seconden < 0) seconden = 0;
+
             document.getElementById("timer-display").innerText = formatteerTijd(seconden);
             updateCirkel();
-            
-            if (seconden > 0 && seconden <= 3) {
-                playGymBeep('countdown');
+
+            // Voorkom dubbele piepjes bij vertragingen
+            if (seconden > 0 && seconden <= 3 && seconden !== laatstAfgespeeldeSeconde) {
+                playGymAudio('countdown');
+                laatstAfgespeeldeSeconde = seconden;
             }
 
             if (seconden <= 0) {
-                playGymBeep('wissel');
-
-                let werkTijd = (parseInt(document.getElementById("input-werk-min").value) * 60) + parseInt(document.getElementById("input-werk-sec").value);
-                let rustTijd = (parseInt(document.getElementById("input-rust-min").value) * 60) + parseInt(document.getElementById("input-rust-sec").value);
+                playGymAudio('wissel');
 
                 if (huidigeFase === 'getready') {
                     huidigeFase = 'werk';
-                    seconden = werkTijd;
-                    maxFaseSeconden = werkTijd;
+                    seconden = faseWerkTijd;
+                    maxFaseSeconden = faseWerkTijd;
                     updateScherm("WERK!", "status-werk", huidigeRonde);
                 } 
                 else if (huidigeFase === 'werk') {
                     huidigeFase = 'rust';
-                    seconden = rustTijd;
-                    maxFaseSeconden = rustTijd;
+                    seconden = faseRustTijd;
+                    maxFaseSeconden = faseRustTijd;
                     updateScherm("RUST!", "status-rust", huidigeRonde);
                 } 
                 else if (huidigeFase === 'rust') {
                     huidigeRonde++;
                     
                     if (huidigeRonde > totaalRondes) {
-                        clearInterval(countdown);
+                        clearInterval(countdownLoop);
                         isRunning = false;
                         maxFaseSeconden = 0;
                         updateScherm("KLAAR!", "status-klaar", totaalRondes);
                         document.getElementById("timer-display").innerText = "DONE";
                         updateCirkel();
-                        
-                        setTimeout(() => playGymBeep('wissel'), 300); 
                         stopTimer(); 
                         return;
                     }
                     
                     huidigeFase = 'werk';
-                    seconden = werkTijd;
-                    maxFaseSeconden = werkTijd;
+                    seconden = faseWerkTijd;
+                    maxFaseSeconden = faseWerkTijd;
                     updateScherm("WERK!", "status-werk", huidigeRonde);
                 }
+                
+                expectedEndTime = Date.now() + (seconden * 1000);
+                laatstAfgespeeldeSeconde = seconden;
+                document.getElementById("timer-display").innerText = formatteerTijd(seconden);
                 updateCirkel();
             }
-        }, 1000);
+        }, 200); // Checkt 5 keer per seconde voor maximale nauwkeurigheid bij achtergrond-hervatting
     }
 
     function pauzeTimer() {
-        clearInterval(countdown);
+        clearInterval(countdownLoop);
         isRunning = false;
         document.getElementById("status-text").innerText = "GEPAUZEERD";
-        
-        // Laat instellingen weer zien bij pauze
         document.getElementById("instellingen-sectie").style.display = "block";
-
         document.getElementById("btn-pauze").style.display = "none";
         document.getElementById("btn-hervat").style.display = "block";
         document.getElementById("btn-reset").style.display = "block";
     }
 
     function stopTimer() {
-        clearInterval(countdown);
+        clearInterval(countdownLoop);
         isRunning = false;
         seconden = 0;
         maxFaseSeconden = 0;
         huidigeRonde = 1;
         huidigeFase = 'getready';
+        laatstAfgespeeldeSeconde = -1;
         
-        // Laat instellingen weer zien bij stop
         document.getElementById("instellingen-sectie").style.display = "block";
-
         document.getElementById("status-text").innerText = "READY TO RUMBLE?";
         updateScherm("READY TO RUMBLE?", "status-klaar", 0);
         document.getElementById("timer-display").innerText = "00:00";
@@ -355,6 +352,17 @@
         let txt = document.getElementById("timer-display");
         txt.className = "timer-box " + kleurKlasse;
     }
+
+    // Automatische synchronisatie zodra de app weer op de voorgrond komt
+    document.addEventListener("visibilitychange", function() {
+        if (!document.hidden && isRunning) {
+            let overgeblevenTijdMilli = expectedEndTime - Date.now();
+            seconden = Math.ceil(overgeblevenTijdMilli / 1000);
+            if (seconden < 0) seconden = 0;
+            document.getElementById("timer-display").innerText = formatteerTijd(seconden);
+            updateCirkel();
+        }
+    });
 </script>
 
 </body>
