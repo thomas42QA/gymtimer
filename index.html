@@ -45,7 +45,6 @@ body {
   overflow: hidden;
 }
 
-/* ── HEADER ─────────────────────────────────────────── */
 .header {
   width: 100%;
   display: flex;
@@ -83,7 +82,6 @@ body {
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-/* ── SETTINGS ────────────────────────────────────────── */
 .settings {
   width: 100%;
   padding: 14px 22px 0;
@@ -129,7 +127,6 @@ input[type="number"] {
 }
 input:focus { outline: none; border-color: var(--ready); }
 
-/* ── MAIN STAGE ──────────────────────────────────────── */
 .stage {
   flex: 1;
   display: flex;
@@ -141,7 +138,6 @@ input:focus { outline: none; border-color: var(--ready); }
   gap: 0;
 }
 
-/* ── COUNTDOWN SPLASH (3-2-1) ───────────────────────── */
 #countdown-splash {
   display: none;
   flex-direction: column;
@@ -172,7 +168,6 @@ input:focus { outline: none; border-color: var(--ready); }
   margin-top: -10px;
 }
 
-/* ── STATUS + ROUND ─────────────────────────────────── */
 .status-wrap {
   text-align: center;
   margin-bottom: 8px;
@@ -198,7 +193,6 @@ input:focus { outline: none; border-color: var(--ready); }
 #round-text .sep { color: #333; margin: 0 3px; }
 #round-text .tot { color: #555; }
 
-/* ── RING ────────────────────────────────────────────── */
 .ring-wrap {
   position: relative;
   width: min(80vw, 320px);
@@ -206,7 +200,6 @@ input:focus { outline: none; border-color: var(--ready); }
 }
 .ring-svg {
   width: 100%; height: 100%;
-  /* rotate(-90deg) starts at top. scaleX(-1) flips so arc goes clockwise (drains clockwise) */
   transform: rotate(-90deg) scaleX(-1);
   overflow: visible;
 }
@@ -222,7 +215,6 @@ input:focus { outline: none; border-color: var(--ready); }
   stroke-linecap: round;
   transition: stroke 0.3s ease;
 }
-/* Glow duplicate */
 .ring-glow {
   fill: none;
   stroke: var(--current);
@@ -254,7 +246,6 @@ input:focus { outline: none; border-color: var(--ready); }
   letter-spacing: 2px;
 }
 
-/* ── BUTTONS ─────────────────────────────────────────── */
 .btn-row {
   display: flex;
   gap: 10px;
@@ -284,7 +275,6 @@ button:hover  { opacity: 0.85; }
 .btn-stop   { background: #b71c1c; }
 .btn-reset  { background: #1e1e1e; border: 1px solid #2a2a2a; }
 
-/* ── PWA TIP ─────────────────────────────────────────── */
 .tip {
   font-family: 'Share Tech Mono', monospace;
   font-size: 0.58rem;
@@ -298,14 +288,17 @@ button:hover  { opacity: 0.85; }
 </head>
 <body>
 
-<!-- COUNTDOWN SPLASH -->
+<audio id="audio-tick" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
+<audio id="audio-start" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
+<audio id="audio-switch" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
+<audio id="audio-done" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
+
 <div id="countdown-splash">
   <div class="splash-number" id="splash-num">3</div>
   <div class="splash-label">GET READY</div>
   <button class="btn-stop splash-stop" onclick="onStop()" style="margin-top:32px;min-width:130px;font-size:1.2rem;letter-spacing:3px;padding:15px 28px;">STOP</button>
 </div>
 
-<!-- HEADER -->
 <div class="header">
   <div class="logo">GYM <span>TIMER</span></div>
   <div class="wake-pill">
@@ -314,7 +307,6 @@ button:hover  { opacity: 0.85; }
   </div>
 </div>
 
-<!-- SETTINGS -->
 <div class="settings" id="settings">
   <div class="row">
     <label>WORK</label>
@@ -338,7 +330,6 @@ button:hover  { opacity: 0.85; }
   </div>
 </div>
 
-<!-- STAGE -->
 <div class="stage">
   <div class="status-wrap">
     <div id="status-text">READY?</div>
@@ -373,101 +364,46 @@ button:hover  { opacity: 0.85; }
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════
-   AUDIO ENGINE — iOS background-safe
-   
-   The problem: iOS suspends AudioContext when the app goes to
-   background or screen dims, even in PWA mode.
-   
-   The fix: Once the user taps START (gesture unlocks audio),
-   we schedule a recurring 1-sample silent buffer every 20s.
-   This "pings" the audio session just often enough to keep it
-   alive without claiming audio focus — so Spotify keeps playing.
-   
-   Unlike a looping buffer, this approach:
-   - Does NOT interrupt background music (uses same session)
-   - Survives iOS background throttling
-   - Costs almost zero CPU
-═══════════════════════════════════════════════════════════════ */
 let AC = null;
-let audioUnlocked = false;
-let keepAliveTimer = null;
+let isRunning   = false;
+let phase       = 'idle';   
+let curRound    = 1;
+let totalRounds = 8;
+let werkSec     = 20;
+let rustSec     = 10;
+let phaseEndTime = 0;
+let phaseTotalSec = 0;
+let lastBeepSec = -1;
+const CIRC = 2 * Math.PI * 44; 
+let ringAnim = null; 
+let loop = null;
+let splashTimer = null;
+let wakeLock = null;
 
-function ensureAudio() {
+// Genereer de pro-synth audio buffers dynamisch bij de startklik
+function setupProAudioChannels() {
   if (!AC) {
-    try {
-      AC = new (window.AudioContext || window.webkitAudioContext)({
-        // 'ambient' category on iOS = mixes with other audio, doesn't duck Spotify
-        latencyHint: 'interactive'
-      });
-    } catch(e) {
-      AC = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    AC = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (AC.state === 'suspended') AC.resume();
+
+  // Koppel de HTML5 audio elementen aan de webaudio engine om achtergrond-muting te omzeilen
+  ['tick', 'start', 'switch', 'done'].forEach(type => {
+    const el = document.getElementById(`audio-${type}`);
+    // Dit forceert iOS om het kanaal open te houden op het homescherm
+    el.play().then(() => { el.pause(); }).catch(() => {});
+  });
 }
 
-function keepAlive() {
-  if (!AC || !isRunning) return;
-  if (AC.state === 'suspended') AC.resume();
-  // Schedule a 1-sample silent buffer — just enough to ping the session
-  try {
-    const buf = AC.createBuffer(1, 1, AC.sampleRate);
-    const src = AC.createBufferSource();
-    src.buffer = buf;
-    src.connect(AC.destination);
-    src.start();
-  } catch(e) {}
-  // Reschedule — every 20s is enough to prevent iOS from closing the session
-  keepAliveTimer = setTimeout(keepAlive, 20000);
-}
-
-function startKeepAlive() {
-  stopKeepAlive();
-  keepAlive();
-}
-
-function stopKeepAlive() {
-  if (keepAliveTimer) { clearTimeout(keepAliveTimer); keepAliveTimer = null; }
-}
-
-function unlockAudio() {
-  if (audioUnlocked) return;
-  ensureAudio();
-  // Play silent primer on the gesture — this opens the iOS audio session
-  const buf = AC.createBuffer(1, 1, AC.sampleRate);
-  const src = AC.createBufferSource();
-  src.buffer = buf;
-  src.connect(AC.destination);
-  src.start(0);
-  audioUnlocked = true;
-  startKeepAlive();
-}
-
-// Re-open audio session if page becomes visible again
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && AC) {
-    AC.resume().catch(() => {});
-    if (isRunning) startKeepAlive();
-  }
-});
-
-/*
-  Sounds — clean single tones:
-  'tick'   — short sharp beep (3-2-1 countdown and end-of-phase 3-2-1)
-  'start'  — one punchy beep when WORK begins
-  'switch' — different pitch when REST begins
-  'done'   — one long sustained tone to signal workout complete
-*/
 function beep(type) {
-  ensureAudio();
-  if (AC.state === 'suspended') { AC.resume(); }
+  if (!AC) return;
+  if (AC.state === 'suspended') AC.resume();
+  
   const t = AC.currentTime;
-
-  if      (type === 'tick')   singleBeep(3500, 0.9, t, 0.07);
-  else if (type === 'start')  singleBeep(3000, 1.0, t, 0.14);
-  else if (type === 'switch') singleBeep(1800, 1.0, t, 0.18);
-  else if (type === 'done')   singleBeep(880,  1.0, t, 1.2);
+  if      (type === 'tick')   singleBeep(3200, 0.8, t, 0.08);
+  else if (type === 'start')  singleBeep(2500, 0.9, t, 0.25);
+  else if (type === 'switch') singleBeep(1500, 0.9, t, 0.30);
+  else if (type === 'done')   singleBeep(900,  1.0, t, 1.5);
 }
 
 function singleBeep(freq, vol, startAt, dur) {
@@ -477,55 +413,36 @@ function singleBeep(freq, vol, startAt, dur) {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startAt);
     gain.gain.setValueAtTime(0.0001, startAt);
-    gain.gain.linearRampToValueAtTime(vol, startAt + 0.003);
-    gain.gain.setValueAtTime(vol, startAt + dur * 0.65);
+    gain.gain.linearRampToValueAtTime(vol, startAt + 0.005);
+    gain.gain.setValueAtTime(vol, startAt + dur * 0.7);
     gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
     osc.connect(gain);
     gain.connect(AC.destination);
     osc.start(startAt);
-    osc.stop(startAt + dur + 0.01);
+    osc.stop(startAt + dur + 0.02);
   } catch(e) {}
 }
 
-
-/* ═══════════════════════════════════════════════════════════════
-   WAKE LOCK
-═══════════════════════════════════════════════════════════════ */
-let wakeLock = null;
 async function reqWake() {
   if ('wakeLock' in navigator) {
     try {
       wakeLock = await navigator.wakeLock.request('screen');
       document.getElementById('wake-dot').classList.add('on');
       document.getElementById('wake-lbl').textContent = 'SCHERM AAN: AAN';
-      wakeLock.addEventListener('release', () => {
-        document.getElementById('wake-dot').classList.remove('on');
-        document.getElementById('wake-lbl').textContent = 'SCHERM AAN: UIT';
-      });
     } catch(e) {}
   }
 }
+
 function dropWake() {
-  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  if (wakeLock) { 
+    wakeLock.release().then(() => { wakeLock = null; });
+    document.getElementById('wake-dot').classList.remove('on');
+    document.getElementById('wake-lbl').textContent = 'SCHERM AAN: UIT';
+  }
 }
 
-
-/* ═══════════════════════════════════════════════════════════════
-   RING ANIMATION
-   The ring uses CSS animation (linear, exact duration) so it
-   sweeps perfectly smoothly — no per-frame JS jitter.
-═══════════════════════════════════════════════════════════════ */
-const CIRC = 2 * Math.PI * 44; // 276.46
-
-let ringAnim = null; // current CSS animation reference via style injection
-
-function startRingAnimation(durationSec) {
-  // Always starts from offset=0 (full ring) — used when a phase begins fresh
-  _animateRing(0, durationSec);
-}
-
+function startRingAnimation(durationSec) { _animateRing(0, durationSec); }
 function resumeRingAnimation(durationSec) {
-  // Starts from wherever the ring was frozen at pause
   const fromOffset = pausedOffset !== null ? pausedOffset : 0;
   _animateRing(fromOffset, durationSec);
   pausedOffset = null;
@@ -534,23 +451,16 @@ function resumeRingAnimation(durationSec) {
 function _animateRing(fromOffset, durationSec) {
   const track = document.getElementById('ring-track');
   const glow  = document.getElementById('ring-glow');
-
   track.style.animation = 'none';
   glow.style.animation  = 'none';
   track.style.strokeDashoffset = fromOffset;
   glow.style.strokeDashoffset  = fromOffset;
-  // Force reflow so the browser registers the new start value
   track.getBoundingClientRect();
 
   const id = 'kf_' + Date.now();
   const style = document.createElement('style');
   style.id = id;
-  style.textContent = `
-    @keyframes ${id} {
-      from { stroke-dashoffset: ${fromOffset}; }
-      to   { stroke-dashoffset: ${CIRC}; }
-    }
-  `;
+  style.textContent = `@keyframes ${id} { from { stroke-dashoffset: ${fromOffset}; } to { stroke-dashoffset: ${CIRC}; } }`;
   document.head.appendChild(style);
   if (ringAnim) document.getElementById(ringAnim)?.remove();
   ringAnim = id;
@@ -571,31 +481,13 @@ function stopRing(fillPercent = 0) {
 }
 
 function setRingColor(phase) {
-  const c = phase === 'werk' ? 'var(--work)' :
-            phase === 'rust' ? 'var(--rest)' :
-                               'var(--ready)';
+  const c = phase === 'werk' ? 'var(--work)' : phase === 'rust' ? 'var(--rest)' : 'var(--ready)';
   document.documentElement.style.setProperty('--current', c);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   TIMER STATE
-═══════════════════════════════════════════════════════════════ */
-let loop = null;
-let isRunning   = false;
-let phase       = 'idle';   // idle | countdown | werk | rust | done
-let curRound    = 1;
-let totalRounds = 8;
-let werkSec     = 20;
-let rustSec     = 10;
-let phaseEndTime = 0;
-let phaseTotalSec = 0;
-let lastBeepSec = -1;
-
 function readInputs() {
-  werkSec     = (parseInt(document.getElementById('werk-min').value) * 60)
-              +  parseInt(document.getElementById('werk-sec').value);
-  rustSec     = (parseInt(document.getElementById('rust-min').value) * 60)
-              +  parseInt(document.getElementById('rust-sec').value);
+  werkSec     = (parseInt(document.getElementById('werk-min').value) * 60) + parseInt(document.getElementById('werk-sec').value);
+  rustSec     = (parseInt(document.getElementById('rust-min').value) * 60) + parseInt(document.getElementById('rust-sec').value);
   totalRounds = parseInt(document.getElementById('rondes').value);
   if (!werkSec) werkSec = 20;
   if (!rustSec) rustSec = 10;
@@ -625,8 +517,6 @@ function showTime(sec) {
   document.getElementById('timer-display').textContent = fmt(sec);
 }
 
-/* ─── Countdown splash (3-2-1) ────────────────────────── */
-let splashTimer = null;
 function runCountdown(cb) {
   const splash = document.getElementById('countdown-splash');
   const numEl  = document.getElementById('splash-num');
@@ -635,7 +525,6 @@ function runCountdown(cb) {
 
   function tick() {
     numEl.textContent = n;
-    // Restart animation
     numEl.style.animation = 'none';
     numEl.getBoundingClientRect();
     numEl.style.animation = '';
@@ -653,7 +542,6 @@ function runCountdown(cb) {
   tick();
 }
 
-/* ─── Phase transitions ───────────────────────────────── */
 function beginPhase(ph, sec, round) {
   phase         = ph;
   curRound      = round;
@@ -682,7 +570,6 @@ function startMainLoop() {
   loop = setInterval(() => {
     const remaining = Math.max(0, Math.ceil((phaseEndTime - Date.now()) / 1000));
 
-    // Countdown beeps 3-2-1
     if (remaining > 0 && remaining <= 3 && remaining !== lastBeepSec) {
       beep('tick');
       lastBeepSec = remaining;
@@ -691,7 +578,6 @@ function startMainLoop() {
     showTime(remaining);
 
     if (remaining <= 0) {
-      // Phase complete
       if (phase === 'werk') {
         beginPhase('rust', rustSec, curRound);
       } else if (phase === 'rust') {
@@ -720,9 +606,6 @@ function finishWorkout() {
   btnState('done');
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   BUTTON ACTIONS
-═══════════════════════════════════════════════════════════════ */
 function btnState(state) {
   const show = id => document.getElementById(id).style.display = 'block';
   const hide = id => document.getElementById(id).style.display = 'none';
@@ -734,7 +617,7 @@ function btnState(state) {
 }
 
 function onStart() {
-  unlockAudio();  // unlock iOS audio on user gesture
+  setupProAudioChannels();  
   readInputs();
 
   document.getElementById('settings').classList.add('hidden');
@@ -754,14 +637,13 @@ function onStart() {
   });
 }
 
-let pausedOffset = null; // stroke-dashoffset value frozen at pause
+let pausedOffset = null; 
 
 function onPause() {
   clearInterval(loop);
   clearTimeout(splashTimer);
   document.getElementById('countdown-splash').classList.remove('visible');
 
-  // Read the COMPUTED (mid-animation) offset value and freeze it
   const track = document.getElementById('ring-track');
   const glow  = document.getElementById('ring-glow');
   const liveOffset = parseFloat(getComputedStyle(track).strokeDashoffset);
@@ -780,17 +662,14 @@ function onPause() {
 }
 
 function onResume() {
-  unlockAudio();
+  setupProAudioChannels();
   document.getElementById('settings').classList.add('hidden');
   isRunning = true;
   reqWake();
 
-  // Remaining seconds based on wall clock
   const remaining = Math.max(1, Math.ceil((phaseEndTime - Date.now()) / 1000));
-  // Rebase end time from now
   phaseEndTime = Date.now() + remaining * 1000;
 
-  // Resume ring FROM the frozen offset position
   resumeRingAnimation(remaining);
 
   if (phase === 'werk') setStatus('WORK!', 'werk');
@@ -806,7 +685,6 @@ function onStop() {
   document.getElementById('countdown-splash').classList.remove('visible');
   isRunning = false;
   phase = 'idle';
-  stopKeepAlive();
   dropWake();
   reset();
 }
@@ -825,13 +703,12 @@ function reset() {
   btnState('idle');
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   VISIBILITY — wake lock recovery
-   (Audio visibilitychange is handled in the audio engine above)
-═══════════════════════════════════════════════════════════════ */
 document.addEventListener('visibilitychange', async () => {
-  if (!document.hidden && isRunning) {
-    await reqWake();
+  if (!document.hidden) {
+    if (AC) AC.resume();
+    if (isRunning) {
+      await reqWake();
+    }
   }
 });
 
