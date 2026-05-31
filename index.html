@@ -288,10 +288,7 @@ button:hover  { opacity: 0.85; }
 </head>
 <body>
 
-<audio id="audio-tick" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
-<audio id="audio-start" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
-<audio id="audio-switch" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
-<audio id="audio-done" preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
+<audio id="audio-keepalive" loop playsinline src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
 
 <div id="countdown-splash">
   <div class="splash-number" id="splash-num">3</div>
@@ -359,8 +356,7 @@ button:hover  { opacity: 0.85; }
 </div>
 
 <div class="tip" id="tip">
-  📲 INSTALLEER ALS APP: SAFARI → <strong style="color:#333">□↑</strong> → "ZET OP BEGINSCHERM"<br>
-  DAN WERKT AUDIO OOK ALS SCHERM DIMMT
+  📲 INSTALLEER ALS APP: SAFARI → <strong style="color:#333">□↑</strong> → "ZET OP BEGINSCHERM"
 </div>
 
 <script>
@@ -380,19 +376,24 @@ let loop = null;
 let splashTimer = null;
 let wakeLock = null;
 
-// Genereer de pro-synth audio buffers dynamisch bij de startklik
-function setupProAudioChannels() {
+// Start de onzichtbare audiolus om de achtergrondvrijgave af te dwingen
+function activateBackgroundAudio() {
+  const keepAliveAudio = document.getElementById('audio-keepalive');
+  if (keepAliveAudio) {
+    keepAliveAudio.play().catch(e => console.log("Achtergrond audio start mislukt:", e));
+  }
+  
   if (!AC) {
     AC = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (AC.state === 'suspended') AC.resume();
+}
 
-  // Koppel de HTML5 audio elementen aan de webaudio engine om achtergrond-muting te omzeilen
-  ['tick', 'start', 'switch', 'done'].forEach(type => {
-    const el = document.getElementById(`audio-${type}`);
-    // Dit forceert iOS om het kanaal open te houden op het homescherm
-    el.play().then(() => { el.pause(); }).catch(() => {});
-  });
+function deactivateBackgroundAudio() {
+  const keepAliveAudio = document.getElementById('audio-keepalive');
+  if (keepAliveAudio) {
+    keepAliveAudio.pause();
+  }
 }
 
 function beep(type) {
@@ -603,6 +604,7 @@ function finishWorkout() {
   document.getElementById('timer-display').textContent = 'DONE';
   document.getElementById('timer-display').classList.remove('big');
   dropWake();
+  deactivateBackgroundAudio();
   btnState('done');
 }
 
@@ -617,7 +619,7 @@ function btnState(state) {
 }
 
 function onStart() {
-  setupProAudioChannels();  
+  activateBackgroundAudio();  
   readInputs();
 
   document.getElementById('settings').classList.add('hidden');
@@ -642,6 +644,7 @@ let pausedOffset = null;
 function onPause() {
   clearInterval(loop);
   clearTimeout(splashTimer);
+  deactivateBackgroundAudio();
   document.getElementById('countdown-splash').classList.remove('visible');
 
   const track = document.getElementById('ring-track');
@@ -662,7 +665,7 @@ function onPause() {
 }
 
 function onResume() {
-  setupProAudioChannels();
+  activateBackgroundAudio();
   document.getElementById('settings').classList.add('hidden');
   isRunning = true;
   reqWake();
@@ -682,6 +685,7 @@ function onResume() {
 function onStop() {
   clearInterval(loop);
   clearTimeout(splashTimer);
+  deactivateBackgroundAudio();
   document.getElementById('countdown-splash').classList.remove('visible');
   isRunning = false;
   phase = 'idle';
@@ -703,16 +707,18 @@ function reset() {
   btnState('idle');
 }
 
+// Synchronisatie-check zodra de app weer in beeld springt
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden) {
     if (AC) AC.resume();
     if (isRunning) {
       await reqWake();
+      const remaining = Math.max(0, Math.ceil((phaseEndTime - Date.now()) / 1000));
+      showTime(remaining);
     }
   }
 });
 
-// Registreer de Service Worker voor PWA-functionaliteit op de achtergrond
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
@@ -721,7 +727,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Init
 reset();
 </script>
 </body>
